@@ -1,6 +1,6 @@
-# Real-Time Translation Desktop Overlay
+# Real-Time Translation & Interview Assistant Overlay
 
-A functional prototype of a desktop overlay application for real-time translation during video calls. It listens to live audio from the microphone, transcribes speech to text using OpenAI Whisper, translates it to Spanish using OpenAI GPT, and displays both the original and translated text in a semi-transparent, always-on-top window using Tkinter.
+A functional prototype of a desktop overlay application for real-time translation and interview assistance during video calls. It listens to live audio from the microphone, transcribes speech to text using OpenAI Whisper, translates it to Spanish using `gpt-4o-mini`, and provides context-aware suggested responses for interviews. All of this is displayed in a semi-transparent, always-on-top window using Tkinter.
 
 ## Requirements
 
@@ -44,7 +44,9 @@ Run the application:
 python app.py
 ```
 
-A semi-transparent black window will appear at the bottom of your screen. It will continuously listen to your microphone in 3-second chunks, transcribe the audio, translate it to Spanish, and display both the original text and the translated text on the screen.
+A semi-transparent black window will appear at the bottom of your screen. It will continuously listen to your microphone in 1-second chunks, transcribe the audio, translate it to Spanish, and display the original text, the translated text, and AI-suggested responses on the screen.
+
+The application maintains a brief conversation history to provide relevant, context-aware suggestions, perfect for interview scenarios.
 
 To exit, simply close the overlay window.
 

@@ -15,7 +15,7 @@ load_dotenv()
 
 # Configuration
 SAMPLE_RATE = 16000  # 16kHz is optimal for Whisper
-CHUNK_DURATION = 3   # 3 seconds per audio chunk
+CHUNK_DURATION = 1   # 1 second per audio chunk for lower latency
 CHANNELS = 1         # Mono audio
 
 # Initialize OpenAI Client
@@ -28,6 +28,9 @@ text_queue = queue.Queue()
 
 # Global flag to control loops
 is_running = True
+
+# Conversation history for context and response suggestion
+conversation_history = []
 
 def record_audio():
     """
@@ -83,7 +86,7 @@ def translate_text(text):
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo", # GPT-3.5 is fast and cost-effective; GPT-4 can be used for better accuracy
+            model="gpt-4o-mini", # Fast and cost-effective model
             messages=[
                 {
                     "role": "system",
@@ -97,6 +100,32 @@ def translate_text(text):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"Error translating text: {e}")
+        return ""
+
+def generate_response(text, history):
+    """
+    Suggests a response based on the transcription and conversation history.
+    """
+    try:
+        # Keep history to a reasonable size to save tokens
+        recent_history = " ".join(history[-10:])
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an assistant helping in a job interview. Respond professionally in English. Keep your suggestion concise and natural."
+                },
+                {
+                    "role": "user",
+                    "content": f"Conversation history: {recent_history}\nUser just heard: {text}\nSuggest a short, professional response."
+                }
+            ]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"Error generating response: {e}")
         return ""
 
 def process_pipeline():
@@ -119,33 +148,40 @@ def process_pipeline():
             # 2. Translate the text to Spanish
             translated_text = translate_text(original_text)
 
-            # 3. Queue the texts for the UI to display
-            text_queue.put((original_text, translated_text))
+            # 3. Save to conversation history
+            conversation_history.append(original_text)
+
+            # 4. Generate AI response suggestion
+            suggested_response = generate_response(original_text, conversation_history)
+
+            # 5. Queue the texts for the UI to display
+            text_queue.put((original_text, translated_text, suggested_response))
 
         except queue.Empty:
             continue
         except Exception as e:
             print(f"Error in processing pipeline: {e}")
 
-def update_ui(root, original_label, translated_label):
+def update_ui(root, original_label, translated_label, response_label):
     """
-    Continuously updates the Tkinter UI with new transcriptions and translations.
+    Continuously updates the Tkinter UI with new transcriptions, translations, and suggestions.
     """
     try:
         # Process all available text updates in the queue
         while not text_queue.empty():
-            original_text, translated_text = text_queue.get_nowait()
+            original_text, translated_text, response = text_queue.get_nowait()
 
             # Update the overlay labels
             original_label.config(text=f"Original: {original_text}")
             translated_label.config(text=f"Translated: {translated_text}")
+            response_label.config(text=f"Suggested: {response}")
 
     except Exception as e:
         print(f"Error updating UI: {e}")
 
     # Schedule the next UI update check in 100 milliseconds
     if is_running:
-        root.after(100, update_ui, root, original_label, translated_label)
+        root.after(100, update_ui, root, original_label, translated_label, response_label)
 
 def on_closing(root):
     """
@@ -169,7 +205,7 @@ def create_gui():
 
     # Window dimensions and positioning
     window_width = 700
-    window_height = 150
+    window_height = 200
     screen_width = root.winfo_screenwidth()
     screen_height = root.winfo_screenheight()
 
@@ -193,11 +229,17 @@ def create_gui():
                                 wraplength=680, justify="center")
     translated_label.pack(pady=10)
 
+    # Label for AI suggested response
+    response_label = tk.Label(root, text="Waiting to suggest a response...",
+                              font=("Helvetica", 12), fg="lightgreen", bg="black",
+                              wraplength=680, justify="center")
+    response_label.pack(pady=10)
+
     # Handle the window close event gracefully
     root.protocol("WM_DELETE_WINDOW", lambda: on_closing(root))
 
     # Start the UI update loop
-    root.after(100, update_ui, root, original_label, translated_label)
+    root.after(100, update_ui, root, original_label, translated_label, response_label)
 
     return root
 
